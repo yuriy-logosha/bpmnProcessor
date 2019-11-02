@@ -1,11 +1,12 @@
 import parser, sys, os
 from constants import METHODS_DELIMITER, INDENT
+from datetime import datetime
 
 f = None
 
 main_name = 'main'
 
-file_head = ['#!/usr/bin/env python3']
+file_head = ['#!/usr/bin/env python3', ' ', '#', '# Generated at ' + datetime.now().strftime("%d/%m/%Y %H:%M:%S") , '# ', '']
 
 main_method = ['def _%main_name%():']
 
