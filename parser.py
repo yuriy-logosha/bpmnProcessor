@@ -19,8 +19,10 @@ _import_section = []
 def read_file(file):
     global root, proc, start, end
     root = ET.parse(file).getroot()
-    collaboration = root.findall(COLLABORATION, NAMESPACE)[0]
-    participants = collaboration.findall(PARTICIPANT, NAMESPACE)
+    _collaboration = root.findall(COLLABORATION, NAMESPACE)
+    if _collaboration:
+        collaboration = _collaboration[0]
+        participants = collaboration.findall(PARTICIPANT, NAMESPACE)
     proc = root.findall(PROCESS, NAMESPACE)[0]
     start = proc.findall(START, NAMESPACE)[0]
     end = proc.findall(END, NAMESPACE)[0]
