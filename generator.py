@@ -1,4 +1,4 @@
-import parser, sys
+import parser, sys, os
 from constants import METHODS_DELIMITER, INDENT
 
 f = None
@@ -21,10 +21,12 @@ def set_main_name(name=main_name):
     default_lines = [w.replace('%main_name%', main_name) for w in default_lines]
 
 
-def create_file(file_name):
+def create_file(_file_name):
     global f
-    f = open(file_name + ".py", "w+")
-    print(file_name + ".py created!")
+    filename, file_extension = os.path.splitext(_file_name)
+
+    f = open(filename + ".py", "w+")
+    print(filename + ".py created!")
 
 
 def close_file():
@@ -36,12 +38,11 @@ def write(lines=METHODS_DELIMITER, lvl=0):
     [f.write("%s%s\r\n" % (INDENT * lvl, line)) for line in lines]
 
 
-def generate(_from, _file_name):
+def generate(_file_name):
     set_main_name()
+    import_section, body = parser.parse(_file_name)
 
-    import_section, body = parser.parse(_from + _file_name + '.bpmn')
-
-    create_file(_from + _file_name)
+    create_file(_file_name)
 
     write(file_head)
     write(import_section)
@@ -56,19 +57,10 @@ def generate(_from, _file_name):
 
 
 if __name__ == "__main__":
-    _from = None
     _file_name = None
 
-    if len(sys.argv) <= 2:
+    if len(sys.argv) < 1:
         print('Not enough arguments! ')
         exit()
 
-    for arg in sys.argv:
-        pair = arg.split('=')
-        if len(pair) is 2 and 'from' in pair[0]:
-            _from = pair[1]
-        if len(pair) is 2 and 'file-name' in pair[0]:
-            _file_name = pair[1]
-
-    if _from and _file_name:
-        generate(_from, _file_name)
+    generate(sys.argv[1])
