@@ -131,7 +131,9 @@ def resolve_target(_target, _indent=0):
             iterate_from_node(get_el_from_flow(get_by_id(outgoings[1].text)), _target)
             target = get_el_from_flow(get_by_id(outgoings[0].text))
     else:
-        _lines.append('%s%s' % (INDENT * _indent, search_for_imports_in(get_name(_target), _import_section)))
+        _name_text = get_name(_target)
+        for t in _name_text.split('\n'):
+            _lines.append('%s%s' % (INDENT * _indent, search_for_imports_in(t, _import_section)))
         target = get_target(_target)
 
 
