@@ -5,6 +5,9 @@ from datetime import datetime
 f = None
 
 main_name = 'main'
+file_name = None
+file_extension = None
+path_file_name = None
 
 file_head = ['#!/usr/bin/env python3', ' ', '#', '# Generated at ' + datetime.now().strftime("%d/%m/%Y %H:%M:%S") , '# ', '']
 
@@ -15,6 +18,12 @@ default_lines = [
     '    _%main_name%()']
 
 
+def get_file_name(_file_name):
+    global path_file_name, file_name, file_extension
+    file_name, file_extension = os.path.splitext(os.path.basename(_file_name))
+    path_file_name, file_extension = os.path.splitext(_file_name)
+
+
 def set_main_name(name=main_name):
     global main_name, main_method, default_lines
     main_name = name
@@ -23,11 +32,9 @@ def set_main_name(name=main_name):
 
 
 def create_file(_file_name):
-    global f
-    filename, file_extension = os.path.splitext(_file_name)
-
-    f = open(filename + ".py", "w+")
-    print(filename + ".py created!")
+    global f, path_file_name
+    f = open(path_file_name + ".py", "w+")
+    print("%s %s.py created!" % (datetime.now().strftime("%d/%m/%Y %H:%M:%S"), path_file_name))
 
 
 def close_file():
@@ -40,7 +47,9 @@ def write(lines=METHODS_DELIMITER, lvl=0):
 
 
 def generate(_file_name):
-    set_main_name()
+    global file_name
+    get_file_name(_file_name)
+    set_main_name(file_name)
     import_section, body = parser.parse(_file_name)
 
     create_file(_file_name)

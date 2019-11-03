@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from utils import reverse
 from analyzer import search_for_imports_in
 from constants import INDENT, NAMESPACE, EXCLUSIVEGATEWAY, TASK, START, END, COLLABORATION, PARTICIPANT, PROCESS, INCOMING, OUTGOING, STANDARDLOOPCHARACTERISTICS
+from datetime import datetime
 
 root: ET = None
 collaboration: ET = None
@@ -139,7 +140,7 @@ def resolve_target(_target, _indent=0):
 
 def parse(file_name):
     global start, end, target, _lines, _import_section
-    print('Parsing ' + file_name)
+    print('%s Parsing %s' % (datetime.now().strftime("%d/%m/%Y %H:%M:%S"), file_name))
     read_file(file_name)
 
     target = get_target(start)
@@ -147,7 +148,7 @@ def parse(file_name):
         resolve_target(target)
 
     print(*_lines, sep = "\n")
-    print(file_name + ' successfully parsed.')
+    print('%s %s successfully parsed.' % (datetime.now().strftime("%d/%m/%Y %H:%M:%S"), file_name))
     return _import_section, _lines
 
 
