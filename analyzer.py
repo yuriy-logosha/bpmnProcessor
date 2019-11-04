@@ -5,7 +5,9 @@ _import_section = []
 
 def search_for_imports_in(line, _import_section):
     if '.' in line:
-        _import_section.append('import ' + line.split('.')[0])
+        left = line.split('.')[0]
+        right = left.split(' ')[len(left.split(' '))-1|0]
+        _import_section.append('import %s' % (right))
     return line
 
 
