@@ -134,7 +134,7 @@ def resolve_target(_target, _indent=0):
     else:
         _name_text = get_name(_target)
         for t in _name_text.split('\n'):
-            _lines.append('%s%s' % (INDENT * _indent, search_for_imports_in(t, _import_section)))
+            _lines.append('%s%s' % (INDENT * _indent, t))
         target = get_target(_target)
 
 
