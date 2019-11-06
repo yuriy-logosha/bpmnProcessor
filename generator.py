@@ -13,7 +13,7 @@ file_head = ['#!/usr/bin/env python3', ' ', '#', '# Generated at ' + datetime.no
 
 file_footer = [
     'if __name__ == "__main__":',
-    '    _%main_name%()']
+    '    %main_name%()']
 
 
 def get_file_name(_file_name):
@@ -57,12 +57,11 @@ def generate(_file_name):
 
     for body in bodies:
         for _function in body['functions']:
-            if not main_exists:
-                method_name = "main" if _function['name'] is None else _function['name']
-                if method_name == 'main':
-                    main_exists = True
+            method_name = "main" if _function['name'] is None else _function['name']
+            if method_name == 'main':
+                main_exists = True
 
-            write([f'def _{method_name}():'])
+            write([f'def {method_name}():'])
             write(_function['lines'], 1)
             write()
 
