@@ -84,7 +84,7 @@ def targetRef(el):
 
 
 def name(el):
-    return el.attrib['name']
+    return el.attrib['name'] if 'name' in el.attrib else ""
 
 
 def get_incomings(el):
