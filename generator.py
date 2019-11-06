@@ -11,9 +11,7 @@ path_file_name = None
 
 file_head = ['#!/usr/bin/env python3', ' ', '#', '# Generated at ' + datetime.now().strftime("%d/%m/%Y %H:%M:%S") , '# ', '']
 
-main_method = ['def _%main_name%():']
-
-default_lines = [
+file_footer = [
     'if __name__ == "__main__":',
     '    _%main_name%()']
 
@@ -24,11 +22,9 @@ def get_file_name(_file_name):
     path_file_name, file_extension = os.path.splitext(_file_name)
 
 
-def set_main_name(name=main_name):
-    global main_name, main_method, default_lines
-    main_name = name
-    main_method = [w.replace('%main_name%', main_name) for w in main_method]
-    default_lines = [w.replace('%main_name%', main_name) for w in default_lines]
+def set_main_name(name):
+    global file_footer
+    file_footer = [w.replace('%main_name%', name) for w in file_footer]
 
 
 def create_file(_file_name):
@@ -49,19 +45,32 @@ def write(lines=METHODS_DELIMITER, lvl=0):
 def generate(_file_name):
     global file_name
     get_file_name(_file_name)
-    set_main_name(file_name)
-    import_section, body = parser.parse(_file_name)
+    import_section, bodies = parser.parse(_file_name)
 
     create_file(_file_name)
 
     write(file_head)
     write(import_section)
     write()
+    method_name = "main"
+    main_exists = False
 
-    write(main_method)
-    write(body, 1)
-    write()
-    write(default_lines)
+    for body in bodies:
+        for _function in body['functions']:
+            if not main_exists:
+                method_name = "main" if _function['name'] is None else _function['name']
+                if method_name == 'main':
+                    main_exists = True
+
+            write([f'def _{method_name}():'])
+            write(_function['lines'], 1)
+            write()
+
+    if main_exists:
+        set_main_name('main')
+    else:
+        set_main_name(method_name)
+    write(file_footer)
 
     close_file()
 

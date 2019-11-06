@@ -1,52 +1,89 @@
 import sys
 import xml.etree.ElementTree as ET
-from utils import reverse
-from analyzer import search_for_imports_in
-from constants import INDENT, NAMESPACE, EXCLUSIVEGATEWAY, TASK, START, END, COLLABORATION, PARTICIPANT, PROCESS, INCOMING, OUTGOING, STANDARDLOOPCHARACTERISTICS
+from utils import reverse, build_function
+from analyzer import search_for_imports
+from constants import INDENT, NAMESPACE, EXCLUSIVEGATEWAY, TASK, START, END, COLLABORATION, PARTICIPANT, PROCESS, \
+    LANESET, LANE, FLOWNODEREF, INCOMING, OUTGOING, STANDARDLOOPCHARACTERISTICS, START_TAG, END_TAG
 from datetime import datetime
 
 root: ET = None
-collaboration: ET = None
-participants: ET = None
-proc: ET = None
-start: ET = None
-end: ET = None
 target: ET = None
 
-_lines = []
 _import_section = []
+
+_files = []
+
+_current = None
 
 
 def read_file(file):
-    global root, proc, start, end
+    global root, _current
     root = ET.parse(file).getroot()
-    _collaboration = root.findall(COLLABORATION, NAMESPACE)
-    if _collaboration:
-        collaboration = _collaboration[0]
-        participants = collaboration.findall(PARTICIPANT, NAMESPACE)
-    proc = root.findall(PROCESS, NAMESPACE)[0]
-    start = proc.findall(START, NAMESPACE)[0]
-    end = proc.findall(END, NAMESPACE)[0]
+    collaborations = findall(root, COLLABORATION)
+    if collaborations:
+        participants = findall(collaborations[0], PARTICIPANT)
+        for participant in participants:
+            proc = by_id(processRef(participant), root)
+            _files.append(
+                build_file(name(participant),
+                           build_functions(proc, name(participant))))
+
+        _current = _files[0]
+        return
+
+    proc = findall(root, PROCESS)[0]
+    _current = build_file('Noname',
+                          build_functions(proc, 'main'))
+    _files.append(_current)
 
 
-def get_by_id(id):
-    global proc
-    return proc.findall("./*[@id='"+id+"']", NAMESPACE)[0]
+def build_file(_name, _functions):
+    return {'name': _name, 'functions': _functions}
 
 
-def get_id(el):
-    return el.attrib['id']
+def build_functions(_proc, _name):
+    _functions = []
+    __laneset = findall(_proc, LANESET)
+    if len(__laneset) > 0:
+        _laneset = __laneset[0]
+        _lanes = _laneset.findall(LANE, NAMESPACE)
+        for _lane in _lanes:
+            _refs = build_refs(_lane, _proc)
+            _functions.append(
+                build_function(
+                    name(_lane), _proc=_proc, _start=get_by_tag(START_TAG, _refs), _end=get_by_tag(END_TAG, _refs))
+            )
+    else:
+        _functions.append(build_function(
+            _name, _proc=_proc, _start=_proc.findall(START, NAMESPACE)[0], _end=_proc.findall(END, NAMESPACE)[0]))
+    return _functions
 
 
-def get_process_ref(el):
+def build_refs(_lane, _proc):
+    refs = []
+    _refs = _lane.findall(FLOWNODEREF, NAMESPACE)
+    for _ref in _refs:
+        _el = _proc.findall("./*[@id='" + _ref.text + "']", NAMESPACE)[0]
+        refs.append(_el)
+    return refs
+
+
+def by_id(id, scope=None):
+    global _current
+    if not scope:
+        return _current['proc'].findall("./*[@id='" + id + "']", NAMESPACE)[0]
+    return root.findall("./*[@id='"+id+"']", NAMESPACE)[0]
+
+
+def processRef(el):
     return el.attrib['processRef']
 
 
-def get_target_ref(el):
+def targetRef(el):
     return el.attrib['targetRef']
 
 
-def get_name(el):
+def name(el):
     return el.attrib['name']
 
 
@@ -66,27 +103,27 @@ def get_first_outgoing_text(el):
     return get_outgoings(el)[0].text
 
 
-def get_el_from_flow(el_sequence_flow):
-    return get_by_id(get_target_ref(el_sequence_flow))
+def el_from_flow(el_sequence_flow):
+    return by_id(targetRef(el_sequence_flow))
 
 
 def get_target(el):
-    el_sequence_flow = get_by_id(get_first_outgoing_text(el))
-    return get_el_from_flow(el_sequence_flow)
+    el_sequence_flow = by_id(get_first_outgoing_text(el))
+    return el_from_flow(el_sequence_flow)
 
 
 def get_double_incoming(el):
-    global end
+    global _current
     t = get_target(el)
-    while t and t != end:
+    while t and t != _current['end']:
         if len(get_incomings(t)) >= 2:
             return t
         t = get_target(el)
 
 
 def find_friend(me, friend, all=[]):
-    global end
-    if friend and ((friend in all) or friend is end):
+    global _current
+    if friend and ((friend in all) or friend is _current['end']):
         return False
     if friend and friend is me:
         return True
@@ -97,59 +134,80 @@ def find_friend(me, friend, all=[]):
 
 
 def iterate_from_node(next_node, _end=None):
-    while next_node and next_node != end and next_node != _end:
+    while next_node and next_node != _current['end'] and next_node != _end:
         resolve_target(next_node, 1)
         next_node = get_target(next_node)
 
 
 def resolve_target(_target, _indent=0):
-    global target, _import_section
+    global target, _import_section, _current
     if _target.tag == EXCLUSIVEGATEWAY:
-        _lines.append("%sif %s:" % (INDENT * _indent, search_for_imports_in(get_name(_target), _import_section)))
+        _current['lines'].append("%sif %s:" % (INDENT * _indent, name(_target)))
         outgoings = get_outgoings(_target)
-        flows = [get_by_id(outgoings[0].text), get_by_id(outgoings[1].text)]
-        if 'Y' not in get_name(flows[1]):
+        flows = [by_id(outgoings[0].text), by_id(outgoings[1].text)]
+        if 'Y' not in name(flows[1]):
             reverse(flows)
 
-        next_node = get_el_from_flow(flows[1])
+        next_node = el_from_flow(flows[1])
         endif = get_double_incoming(next_node)
         iterate_from_node(next_node, endif)
 
-        _lines.append('%selse:' % (INDENT * _indent))
+        _current['lines'].append('%selse:' % (INDENT * _indent))
 
-        iterate_from_node(get_el_from_flow(flows[0]), endif)
+        iterate_from_node(el_from_flow(flows[0]), endif)
         target = endif
 
     elif _target.tag == TASK and is_loop(_target):
-        _lines.append("%swhile %s:" % (INDENT * _indent, search_for_imports_in(get_name(_target), _import_section)))
+        _current['lines'].append("%swhile %s:" % (INDENT * _indent, name(_target)))
         outgoings = get_outgoings(_target)
-        out1 = find_friend(_target, get_el_from_flow(get_by_id(outgoings[0].text)))
-        # out2 = find_friend(_target, get_el_from_flow(get_by_id(outgoings[1].text)))
+        out1 = find_friend(_target, el_from_flow(by_id(outgoings[0].text)))
         if out1:
-            iterate_from_node(get_el_from_flow(get_by_id(outgoings[0].text)), _target)
-            target = get_by_id(get_target_ref(get_by_id(outgoings[1].text)))
+            start_iterate_node = el_from_flow(by_id(outgoings[0].text))
+            to_target = by_id(targetRef(by_id(outgoings[1].text)))
         else:
-            iterate_from_node(get_el_from_flow(get_by_id(outgoings[1].text)), _target)
-            target = get_el_from_flow(get_by_id(outgoings[0].text))
+            start_iterate_node = el_from_flow(by_id(outgoings[1].text))
+            to_target = el_from_flow(by_id(outgoings[0].text))
+
+        iterate_from_node(start_iterate_node, _target)
+        target = to_target
+
     else:
-        _name_text = get_name(_target)
-        for t in _name_text.split('\n'):
-            _lines.append('%s%s' % (INDENT * _indent, t))
+        _name_text = name(_target)
+        for _text_line in _name_text.split('\n'):
+            _text = search_for_imports(_text_line, _import_section)
+            if _text:
+                _current['lines'].append('%s%s' % (INDENT * _indent, _text))
         target = get_target(_target)
 
 
 def parse(file_name):
-    global start, end, target, _lines, _import_section
+    global _functions, _current, target, _import_section
     print('%s Parsing %s' % (datetime.now().strftime("%d/%m/%Y %H:%M:%S"), file_name))
     read_file(file_name)
 
-    target = get_target(start)
-    while target and target != end:
-        resolve_target(target)
+    for _f in _files:
+        for _func in _f['functions']:
+            _current = _func
+            target = get_target(_func['start'])
+            while target and target != _func['end']:
+                resolve_target(target)
 
-    print(*_lines, sep = "\n")
+            print('Method: %s' % _func['name'])
+            print(*_func['lines'], sep="\n")
+
     print('%s %s successfully parsed.' % (datetime.now().strftime("%d/%m/%Y %H:%M:%S"), file_name))
-    return _import_section, _lines
+    return _import_section, _files
+
+
+def findall(el, key):
+    return el.findall(key, NAMESPACE)
+
+
+def get_by_tag(tag_name, _refs):
+    for _ref in _refs:
+        if tag_name in _ref.tag:
+            return _ref
+    return None
 
 
 if __name__ == "__main__":
