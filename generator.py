@@ -9,7 +9,7 @@ file_name = None
 file_extension = None
 path_file_name = None
 
-file_head = ['#!/usr/bin/env python3', ' ', '#', '# Generated at ' + datetime.now().strftime("%d/%m/%Y %H:%M:%S") , '# ', '']
+file_head = ['#!/usr/bin/python3', '# -*- coding: ascii -*-', '# Generated at ' + datetime.now().strftime("%d/%m/%Y %H:%M:%S") , '# ', '']
 
 file_footer = [
     'if __name__ == "__main__":',
