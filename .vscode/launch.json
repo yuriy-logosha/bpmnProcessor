@@ -5,12 +5,24 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "parser.py",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/parser.py",
             "console": "integratedTerminal",
-            "args": ["manager.bpmn"]
+            "args": [
+                "file=manager.bpmn"
+            ]
+        },
+        {
+            "name": "generator.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/generator.py",
+            "console": "integratedTerminal",
+            "args": [
+                "manager.bpmn"
+            ]
         }
     ]
 }

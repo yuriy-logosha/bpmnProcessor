@@ -13,6 +13,33 @@ _import_section = []
 _files = []
 _current = None
 
+build_file =    lambda _name, _functions: {'name': _name, 'functions': _functions, 'lines':[]}
+processRef =    lambda el: el.attrib['processRef']
+targetRef =     lambda el: el.attrib['targetRef']
+name =          lambda el: el.attrib['name'] if 'name' in el.attrib else ""
+get_incomings = lambda el: el.findall(INCOMING, NAMESPACE)
+get_outgoings = lambda el: el.findall(OUTGOING, NAMESPACE)
+is_loop =       lambda el:len(el.findall(STANDARDLOOPCHARACTERISTICS, NAMESPACE)) > 0
+el_from_flow =  lambda el_sequence_flow: by_id(targetRef(el_sequence_flow))
+findall =       lambda el, key: el.findall(key, NAMESPACE)
+get_target =    lambda el: el_from_flow(by_id(get_first_outgoing_text(el)))
+get_first_outgoing_text =   lambda el: get_outgoings(el)[0].text
+el_from_flow_by_id =        lambda id: el_from_flow(by_id(id))
+
+
+def build_functions(_proc, _name):
+    _functions = []
+    __laneset = findall(_proc, LANESET)
+    if len(__laneset) > 0:
+        _laneset = __laneset[0]
+        _lanes = _laneset.findall(LANE, NAMESPACE)
+        for _lane in _lanes:
+            _refs = build_refs(_lane, _proc)
+            _functions.append(build_function(name(_lane), _proc, get_by_tag(START_TAG, _refs), get_by_tag(END_TAG, _refs)))
+    else:
+        _functions.append(build_function(_name, _proc, findall(_proc, START)[0], findall(_proc, END)[0]))
+    return _functions
+
 
 def read_file(_file):
     global root, _current
@@ -32,22 +59,6 @@ def read_file(_file):
     _files.append(_current)
 
 
-build_file = lambda _name, _functions: {'name': _name, 'functions': _functions}
-
-def build_functions(_proc, _name):
-    _functions = []
-    __laneset = findall(_proc, LANESET)
-    if len(__laneset) > 0:
-        _laneset = __laneset[0]
-        _lanes = _laneset.findall(LANE, NAMESPACE)
-        for _lane in _lanes:
-            _refs = build_refs(_lane, _proc)
-            _functions.append(build_function(name(_lane), _proc, get_by_tag(START_TAG, _refs), get_by_tag(END_TAG, _refs)))
-    else:
-        _functions.append(build_function(_name, _proc, findall(_proc, START)[0], findall(_proc, END)[0]))
-    return _functions
-
-
 def build_refs(_lane, _proc):
     refs = []
     _refs = _lane.findall(FLOWNODEREF, NAMESPACE)
@@ -58,24 +69,11 @@ def build_refs(_lane, _proc):
 
 
 def by_id(id, scope=None):
-    global _current
+    global _current, root
     if not scope:
         return _current['proc'].findall(f"./*[@id='{id}']", NAMESPACE)[0]
     return root.findall(f"./*[@id='{id}']", NAMESPACE)[0]
-
-
-processRef = lambda el: el.attrib['processRef']
-targetRef = lambda el: el.attrib['targetRef']
-name = lambda el: el.attrib['name'] if 'name' in el.attrib else ""
-get_incomings = lambda el: el.findall(INCOMING, NAMESPACE)
-get_outgoings = lambda el: el.findall(OUTGOING, NAMESPACE)
-is_loop = lambda el:len(el.findall(STANDARDLOOPCHARACTERISTICS, NAMESPACE)) > 0
-get_first_outgoing_text = lambda el: get_outgoings(el)[0].text
-el_from_flow_by_id = lambda id: el_from_flow(by_id(id))
-el_from_flow = lambda el_sequence_flow: by_id(targetRef(el_sequence_flow))
-findall = lambda el, key: el.findall(key, NAMESPACE)
-get_target = lambda el: el_from_flow(by_id(get_first_outgoing_text(el)))
-
+        
 
 def get_double_incoming(el):
     global _current
@@ -102,8 +100,10 @@ def iterate_from_node(next_node, _end=None, idx=0):
     global target
     while next_node and next_node != _current['end'] and next_node != _end:
         resolve_target(next_node, idx + 1)
-        next_node = target
-        #get_target(next_node)
+        if next_node != target:
+            next_node = target
+        else:
+            next_node = _end
 
 
 def resolve_target(_target, _indent=0):
@@ -126,13 +126,22 @@ def resolve_target(_target, _indent=0):
 
     elif _target.tag == TASK and is_loop(_target):
         _name = name(_target)
-        tmplt = _name+':' if "for " in _name and " in " in _name else "%swhile %s:" % (INDENT * _indent, _name)
+        tmplt = '%s%s:' % (INDENT * _indent, _name) if "for " in _name and " in " in _name else "%swhile %s:" % (INDENT * _indent, _name)
         _current['lines'].append(tmplt)
         el0 = el_from_flow_by_id(outgoings[0].text)
-        el1 = el_from_flow_by_id(outgoings[1].text)
-        out1 = find_friend(_target, el0)
-        iterate_from_node(el0 if out1 else el1, _target)
-        target = el1 if out1 else el0
+        el1 = el_from_flow_by_id(outgoings[1].text) if len(outgoings) > 1 else None
+        if len(outgoings) == 2:
+            loop0 = is_loop(el0)
+            loop1 = is_loop(el1)
+            if loop0 or loop1:
+                iterate_from_node(el0 if loop0 else el1, _target, _indent + 1)
+                target = el1 if loop0 else el0
+            else:
+                out1 = find_friend(_target, el0)
+                iterate_from_node(el0 if out1 else el1, _target, _indent + 1)
+                target = el1 if out1 else el0
+        elif len(outgoings) == 1:
+            iterate_from_node(el0, _target, _indent + 1)
     else:
         _name_text = name(_target)
         for _text_line in _name_text.split('\n'):
