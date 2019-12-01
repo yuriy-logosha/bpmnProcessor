@@ -32,9 +32,7 @@ def read_file(_file):
     _files.append(_current)
 
 
-def build_file(_name, _functions):
-    return {'name': _name, 'functions': _functions}
-
+build_file = lambda _name, _functions: {'name': _name, 'functions': _functions}
 
 def build_functions(_proc, _name):
     _functions = []
@@ -66,45 +64,17 @@ def by_id(id, scope=None):
     return root.findall(f"./*[@id='{id}']", NAMESPACE)[0]
 
 
-def processRef(el):
-    return el.attrib['processRef']
-
-
-def targetRef(el):
-    return el.attrib['targetRef']
-
-
-def name(el):
-    return el.attrib['name'] if 'name' in el.attrib else ""
-
-
-def get_incomings(el):
-    return el.findall(INCOMING, NAMESPACE)
-
-
-def get_outgoings(el):
-    return el.findall(OUTGOING, NAMESPACE)
-
-
-def is_loop(el):
-    return len(el.findall(STANDARDLOOPCHARACTERISTICS, NAMESPACE)) > 0
-
-
-def get_first_outgoing_text(el):
-    return get_outgoings(el)[0].text
-
-
-def el_from_flow_by_id(id):
-    return el_from_flow(by_id(id))
-
-
-def el_from_flow(el_sequence_flow):
-    return by_id(targetRef(el_sequence_flow))
-
-
-def get_target(el):
-    el_sequence_flow = by_id(get_first_outgoing_text(el))
-    return el_from_flow(el_sequence_flow)
+processRef = lambda el: el.attrib['processRef']
+targetRef = lambda el: el.attrib['targetRef']
+name = lambda el: el.attrib['name'] if 'name' in el.attrib else ""
+get_incomings = lambda el: el.findall(INCOMING, NAMESPACE)
+get_outgoings = lambda el: el.findall(OUTGOING, NAMESPACE)
+is_loop = lambda el:len(el.findall(STANDARDLOOPCHARACTERISTICS, NAMESPACE)) > 0
+get_first_outgoing_text = lambda el: get_outgoings(el)[0].text
+el_from_flow_by_id = lambda id: el_from_flow(by_id(id))
+el_from_flow = lambda el_sequence_flow: by_id(targetRef(el_sequence_flow))
+findall = lambda el, key: el.findall(key, NAMESPACE)
+get_target = lambda el: el_from_flow(by_id(get_first_outgoing_text(el)))
 
 
 def get_double_incoming(el):
@@ -128,10 +98,12 @@ def find_friend(me, friend, all=[]):
     return find_friend(me, friend, all)
 
 
-def iterate_from_node(next_node, _end=None):
+def iterate_from_node(next_node, _end=None, idx=0):
+    global target
     while next_node and next_node != _current['end'] and next_node != _end:
-        resolve_target(next_node, 1)
-        next_node = get_target(next_node)
+        resolve_target(next_node, idx + 1)
+        next_node = target
+        #get_target(next_node)
 
 
 def resolve_target(_target, _indent=0):
@@ -145,15 +117,17 @@ def resolve_target(_target, _indent=0):
 
         next_node = el_from_flow(flows[1])
         endif = get_double_incoming(next_node)
-        iterate_from_node(next_node, endif)
-
-        _current['lines'].append('%selse:' % (INDENT * _indent))
-
-        iterate_from_node(el_from_flow(flows[0]), endif)
         target = endif
+        iterate_from_node(next_node, endif, _indent)
+
+        if el_from_flow(flows[0]) != endif:
+            _current['lines'].append('%selse:' % (INDENT * _indent))
+            iterate_from_node(el_from_flow(flows[0]), endif, _indent)
 
     elif _target.tag == TASK and is_loop(_target):
-        _current['lines'].append("%swhile %s:" % (INDENT * _indent, name(_target)))
+        _name = name(_target)
+        tmplt = _name+':' if "for " in _name and " in " in _name else "%swhile %s:" % (INDENT * _indent, _name)
+        _current['lines'].append(tmplt)
         el0 = el_from_flow_by_id(outgoings[0].text)
         el1 = el_from_flow_by_id(outgoings[1].text)
         out1 = find_friend(_target, el0)
@@ -185,10 +159,6 @@ def parse(file_name):
 
     print('%s %s successfully parsed.' % (datetime.now().strftime("%d/%m/%Y %H:%M:%S"), file_name))
     return _import_section, _files
-
-
-def findall(el, key):
-    return el.findall(key, NAMESPACE)
 
 
 def get_by_tag(tag_name, _refs):
