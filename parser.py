@@ -16,6 +16,7 @@ _current = None
 build_file =    lambda _name, _functions: {'name': _name, 'functions': _functions, 'lines':[]}
 processRef =    lambda el: el.attrib['processRef']
 targetRef =     lambda el: el.attrib['targetRef']
+sourceRef =     lambda el: el.attrib['sourceRef']
 name =          lambda el: el.attrib['name'] if 'name' in el.attrib else ""
 get_incomings = lambda el: el.findall(INCOMING, NAMESPACE)
 get_outgoings = lambda el: el.findall(OUTGOING, NAMESPACE)
@@ -23,8 +24,10 @@ is_loop =       lambda el:len(el.findall(STANDARDLOOPCHARACTERISTICS, NAMESPACE)
 el_from_flow =  lambda el_sequence_flow: by_id(targetRef(el_sequence_flow))
 findall =       lambda el, key: el.findall(key, NAMESPACE)
 get_target =    lambda el: el_from_flow(by_id(get_first_outgoing_text(el)))
+get_text =      lambda el: el.text
 get_first_outgoing_text =   lambda el: get_outgoings(el)[0].text
 el_from_flow_by_id =        lambda id: el_from_flow(by_id(id))
+get_first_parent =          lambda el: by_id(sourceRef(by_id(get_text(get_incomings(el)[0]))))
 
 
 def build_functions(_proc, _name):
@@ -116,7 +119,7 @@ def resolve_target(_target, _indent=0):
             reverse(flows)
 
         next_node = el_from_flow(flows[1])
-        endif = get_double_incoming(next_node)
+        endif = get_first_parent(_target)
         target = endif
         iterate_from_node(next_node, endif, _indent)
 
