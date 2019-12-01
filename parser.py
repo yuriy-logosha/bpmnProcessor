@@ -78,13 +78,14 @@ def by_id(id, scope=None):
     return root.findall(f"./*[@id='{id}']", NAMESPACE)[0]
         
 
-def get_double_incoming(el):
+def get_my_parent(el, keys):
     global _current
-    t = get_target(el)
-    while t and t != _current['end']:
-        if len(get_incomings(t)) >= 2:
-            return t
-        t = get_target(el)
+    _parent = get_first_parent(el)
+    while _parent:
+        for k in keys:
+            if _parent == k:
+                return k
+        _parent = get_first_parent(_parent)
 
 
 def find_friend(me, friend, all=[]):
@@ -119,7 +120,7 @@ def resolve_target(_target, _indent=0):
             reverse(flows)
 
         next_node = el_from_flow(flows[1])
-        endif = get_first_parent(_target)
+        endif = get_my_parent(_target, [by_id(targetRef(flows[0])), by_id(targetRef(flows[1]))])
         target = endif
         iterate_from_node(next_node, endif, _indent)
 
